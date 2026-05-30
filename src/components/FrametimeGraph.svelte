@@ -22,7 +22,7 @@
     let normalized = 1.0 - (frametime / largestFrametime);
     points.push(normalized);
     
-    if (points.len > 30) {
+    if (points.length > 30) {
       points.shift();
     }
     
