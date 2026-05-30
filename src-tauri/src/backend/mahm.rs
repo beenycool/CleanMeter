@@ -6,7 +6,7 @@ const MAX_STRING_LENGTH: usize = 260;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::System::Memory::{OpenFileMappingW, MapViewOfFile, UnmapViewOfFile, FILE_MAP_READ};
+use windows_sys::Win32::System::Memory::{OpenFileMappingW, MapViewOfFile, UnmapViewOfFile, FILE_MAP_READ, MEMORY_MAPPED_VIEW_ADDRESS};
 
 #[cfg(not(target_os = "windows"))]
 type HANDLE = isize;
@@ -119,14 +119,14 @@ impl WinSharedMemory {
                 0,
             );
 
-            if ptr.is_null() {
+            if ptr.Value.is_null() {
                 CloseHandle(handle);
                 return None;
             }
 
             Some(Self {
                 handle,
-                ptr: ptr as *const u8,
+                ptr: ptr.Value as *const u8,
             })
         }
     }
@@ -144,7 +144,7 @@ impl Drop for WinSharedMemory {
     fn drop(&mut self) {
         unsafe {
             if !self.ptr.is_null() {
-                UnmapViewOfFile(self.ptr as *const _);
+                UnmapViewOfFile(MEMORY_MAPPED_VIEW_ADDRESS { Value: self.ptr as *mut _ });
             }
             if self.handle != 0 {
                 CloseHandle(self.handle);
