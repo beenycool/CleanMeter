@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use std::path::PathBuf;
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 static SIDECAR_CHILD: Mutex<Option<CommandChild>> = Mutex::new(None);
 
@@ -204,7 +204,7 @@ impl ProcessManager {
 
         #[cfg(target_os = "windows")]
         {
-            if !Self.is_elevated() {
+            if !Self::is_elevated() {
                 return Err("Administrator privileges are required to install Windows Service.".to_string());
             }
 
@@ -254,7 +254,7 @@ impl ProcessManager {
 
         #[cfg(target_os = "windows")]
         {
-            if !Self.is_elevated() {
+            if !Self::is_elevated() {
                 return Err("Administrator privileges are required to uninstall Windows Service.".to_string());
             }
 
