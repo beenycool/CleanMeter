@@ -34,11 +34,20 @@ public class PresentMonPoller(ILogger logger)
         Frametime = new PresentMonSensor(_hardware, "frametime", 2, "Frametime");
         CurrentApps = [];
 
-        using var reader = new StreamReader(ResolveFilePath("ignored-processes.txt"));
-        var text = (await reader.ReadToEndAsync())
-            .Split("\n", StringSplitOptions.RemoveEmptyEntries)
-            .Select(x => $"--exclude {x.Trim()}");
-        var filteredApps = string.Join(" ", text);
+        var ignoredProcessesPath = ResolveFilePath("ignored-processes.txt");
+        string filteredApps = "";
+        if (File.Exists(ignoredProcessesPath))
+        {
+            using var reader = new StreamReader(ignoredProcessesPath);
+            var text = (await reader.ReadToEndAsync())
+                .Split("\n", StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => $"--exclude {x.Trim()}");
+            filteredApps = string.Join(" ", text);
+        }
+        else
+        {
+            logger.LogWarning("Ignored processes file not found at {Path}. No processes will be ignored.", ignoredProcessesPath);
+        }
 
         await TerminateCurrentPresentMon();
         var processStartInfo = new ProcessStartInfo
