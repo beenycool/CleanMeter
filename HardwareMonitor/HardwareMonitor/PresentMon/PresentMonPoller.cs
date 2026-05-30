@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Globalization;
 using LibreHardwareMonitor.Hardware;
 using Microsoft.Extensions.Logging;
@@ -34,7 +34,7 @@ public class PresentMonPoller(ILogger logger)
         Frametime = new PresentMonSensor(_hardware, "frametime", 2, "Frametime");
         CurrentApps = [];
 
-        using var reader = new StreamReader(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ignored-processes.txt"));
+        using var reader = new StreamReader(ResolveFilePath("ignored-processes.txt"));
         var text = (await reader.ReadToEndAsync())
             .Split("\n", StringSplitOptions.RemoveEmptyEntries)
             .Select(x => $"--exclude {x.Trim()}");
@@ -47,7 +47,7 @@ public class PresentMonPoller(ILogger logger)
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
-            FileName = "presentmon.exe",
+            FileName = ResolveFilePath("presentmon.exe"),
             Arguments =
                 $"--stop_existing_session --no_console_stats --output_stdout --session_name HardwareMonitor {filteredApps}",
         };
@@ -120,7 +120,7 @@ public class PresentMonPoller(ILogger logger)
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
-            FileName = "presentmon.exe",
+            FileName = ResolveFilePath("presentmon.exe"),
             Arguments =
                 $"--terminate_existing_session --no_console_stats --output_stdout --session_name HardwareMonitor",
         };
@@ -139,5 +139,28 @@ public class PresentMonPoller(ILogger logger)
         OnUpdateApps?.Invoke();
         CurrentApps.Clear();
         _ = ClearCurrentAppsAsync(cancellationToken);
+    }
+
+    private string ResolveFilePath(string filename)
+    {
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        string localPath = Path.Combine(baseDir, filename);
+        if (File.Exists(localPath))
+        {
+            return localPath;
+        }
+
+        // Try the parent directory (Tauri resource dir when running in _up_)
+        string? parentDir = Path.GetDirectoryName(baseDir.TrimEnd(Path.DirectorySeparatorChar));
+        if (!string.IsNullOrEmpty(parentDir))
+        {
+            string parentPath = Path.Combine(parentDir, filename);
+            if (File.Exists(parentPath))
+            {
+                return parentPath;
+            }
+        }
+
+        return filename; // Fallback to filename so it searches PATH
     }
 }
