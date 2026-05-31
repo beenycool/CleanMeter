@@ -42,7 +42,17 @@ public class MonitorPoller(
 
         _computer.Open();
         _computer.Accept(new UpdateVisitor());
-        _presentMonPoller.Start(stoppingToken);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _presentMonPoller.Start(stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "PresentMon poller crashed");
+            }
+        }, stoppingToken);
         _presentMonPoller.OnUpdateApps += SendPresentMonAppsToClients;
         _socketHost.StartServer();
         _socketHost.OnClientData += OnClientData;

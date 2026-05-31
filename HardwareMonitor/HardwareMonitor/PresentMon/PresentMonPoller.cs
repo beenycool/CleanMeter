@@ -25,7 +25,7 @@ public class PresentMonPoller(ILogger logger)
 
     private string _currentSelectedApp = NO_SELECTED_APP;
 
-    public async void Start(CancellationToken stoppingToken)
+    public async Task Start(CancellationToken stoppingToken)
     {
         _cultureInfo.NumberFormat.NumberDecimalSeparator = ".";
 
@@ -49,18 +49,27 @@ public class PresentMonPoller(ILogger logger)
             logger.LogWarning("Ignored processes file not found at {Path}. No processes will be ignored.", ignoredProcessesPath);
         }
 
-        await TerminateCurrentPresentMon();
+        try
+        {
+            await TerminateCurrentPresentMon();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to terminate existing PresentMon session. Continuing...");
+        }
+
+        var presentMonPath = ResolveFilePath("presentmon.exe");
         var processStartInfo = new ProcessStartInfo
         {
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
-            FileName = ResolveFilePath("presentmon.exe"),
+            FileName = presentMonPath,
             Arguments =
                 $"--stop_existing_session --no_console_stats --output_stdout --session_name HardwareMonitor {filteredApps}",
         };
-        logger.LogInformation("Starting PresentMon process with {Arguments}", processStartInfo.Arguments);
+        logger.LogInformation("Starting PresentMon process from {Path} with {Arguments}", presentMonPath, processStartInfo.Arguments);
 
         _process = new Process();
         _process.StartInfo = processStartInfo;
@@ -123,17 +132,18 @@ public class PresentMonPoller(ILogger logger)
 
     private async Task TerminateCurrentPresentMon()
     {
+        var presentMonPath = ResolveFilePath("presentmon.exe");
         var processStartInfo = new ProcessStartInfo
         {
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
-            FileName = ResolveFilePath("presentmon.exe"),
+            FileName = presentMonPath,
             Arguments =
                 $"--terminate_existing_session --no_console_stats --output_stdout --session_name HardwareMonitor",
         };
-        logger.LogInformation("Starting PresentMon process with {Arguments}", processStartInfo.Arguments);
+        logger.LogInformation("Starting PresentMon terminate from {Path} with {Arguments}", presentMonPath, processStartInfo.Arguments);
 
         var process = new Process();
         process.StartInfo = processStartInfo;
@@ -153,23 +163,37 @@ public class PresentMonPoller(ILogger logger)
     private string ResolveFilePath(string filename)
     {
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-        string localPath = Path.Combine(baseDir, filename);
-        if (File.Exists(localPath))
-        {
-            return localPath;
-        }
 
-        // Try the parent directory (Tauri resource dir when running in _up_)
+        string[] searchPaths =
+        [
+            baseDir,
+            Path.Combine(baseDir, "_up_"),
+            Path.Combine(baseDir, "resources"),
+        ];
+
         string? parentDir = Path.GetDirectoryName(baseDir.TrimEnd(Path.DirectorySeparatorChar));
         if (!string.IsNullOrEmpty(parentDir))
         {
-            string parentPath = Path.Combine(parentDir, filename);
-            if (File.Exists(parentPath))
+            searchPaths =
+            [
+                ..searchPaths,
+                parentDir,
+                Path.Combine(parentDir, "_up_"),
+                Path.Combine(parentDir, "resources"),
+            ];
+        }
+
+        foreach (var dir in searchPaths)
+        {
+            var path = Path.Combine(dir, filename);
+            if (File.Exists(path))
             {
-                return parentPath;
+                logger.LogInformation("Resolved {Filename} at {Path}", filename, path);
+                return path;
             }
         }
 
-        return filename; // Fallback to filename so it searches PATH
+        logger.LogWarning("Could not find {Filename} in any search path. Falling back to bare filename.", filename);
+        return filename;
     }
 }
